@@ -1,0 +1,17 @@
+name: scverse_R
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - r-base=4.2
+  - r-essentials
+  - r-irkernel
+  - r-reticulate
+  - r-rcpp
+  - r-rcpparmadillo
+  - r-rcppeigen
+  - r-rcppparallel
+  - r-rcppprogress
+  - r-seurat
+  - bioconductor-singlecellexperiment
