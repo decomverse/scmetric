@@ -1,0 +1,30 @@
+{
+  "template": "https://github.com/scverse/cookiecutter-scverse",
+  "commit": "5d44c58df427f884585ae9772cae81f1b6638f80",
+  "checkout": null,
+  "context": {
+    "cookiecutter": {
+      "project_name": "scmetric",
+      "package_name": "scmetric",
+      "project_description": "Collection of tools for metric learning using single-cell data",
+      "author_full_name": "Shahin Mohammadi",
+      "author_email": "shahin.mohammadi@gmail.com",
+      "github_user": "decomverse",
+      "github_repo": "scmetric",
+      "license": "MIT License",
+      "ide_integration": true,
+      "_copy_without_render": [
+        ".github/workflows/build.yaml",
+        ".github/workflows/test.yaml",
+        "docs/_templates/autosummary/**.rst"
+      ],
+      "_render_devdocs": false,
+      "_jinja2_env_vars": {
+        "lstrip_blocks": true,
+        "trim_blocks": true
+      },
+      "_template": "https://github.com/scverse/cookiecutter-scverse"
+    }
+  },
+  "directory": null
+}
