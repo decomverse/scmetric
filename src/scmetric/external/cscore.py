@@ -158,7 +158,8 @@ def IRLS(
     est[neg_inds, neg_inds] = np.nan
     mu = np.clip(mu, 0, 1)
     mu[neg_inds] = np.nan
-
+    mu[sigma] = np.nan
+    
     # Post-process the co-expression estimates
     if post_process:
         est = post_process_est(est)
@@ -229,10 +230,10 @@ def CSCORE(
     if layer is not None:
         X = adata.layers[layer]
     else:
-        X = adata.raw.X
+        X = adata.X
 
     if seq_depth is None:
-        seq_depth = np.asmatrix(np.ones((1, X.shape[0]), dtype=np.float32)) @ X
+        seq_depth = X.sum(axis = 1).A1
 
     res = IRLS(X, seq_depth, post_process=post_process)
 
@@ -241,7 +242,7 @@ def CSCORE(
     else:
         adata.var[mean_key] = res["mu"]
         adata.var[sigma2_key] = res["sigma2"]
-        adata.var[low_var_key] = adata.var_names[np.isnan(res["sigma2"])]
+        adata.var[low_var_key] = np.isnan(res["sigma2"])
 
         adata.varp[corr_mat_key] = res["corr_mat"]
         if compute_pvals:
@@ -249,3 +250,89 @@ def CSCORE(
             adata.varp[corr_mat_pval_key] = res["pval_mat"]
 
         return adata if copy else None
+
+def compute_pearson_residuals(
+    adata: ad.AnnData,
+    min_variance: float = 1e-12,
+    trim_frac: float = 0.25,
+    z_threshold: float = 10,
+    layer: str | None = None,
+    mu_key: str = "mu",
+    sigma2_key: str = "sigma2",
+    seq_depth_key: str | None = "seq_depth",
+    output_layer: str = "pearson_residuals",
+    return_raw: bool = False,
+    copy: bool = True,
+    **kwargs,
+) -> ad.AnnData | np.ndarray | None:
+    """
+    Compute Pearson residuals for single-cell RNA-seq data.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Single cell data object.
+    min_variance : float, optional
+        Minimum variance threshold, by default 1e-12.
+    trim_frac : float, optional
+        Fraction of data to trim when computing the trimmed mean, by default 0.25.
+    z_threshold : float, optional
+        Threshold for clipping Z-scores, by default 10.
+    layer : str | None, optional
+        Layer of the AnnData object to use, by default None.
+    mu_key : str, optional
+        Key for the mean values in adata.var, by default "mu".
+    sigma2_key : str, optional
+        Key for the variance values in adata.var, by default "sigma2".
+    seq_depth_key : str | None, optional
+        Key for the sequencing depth values in adata.obs, by default None.
+    output_layer : str, optional
+        Layer to store the Pearson residuals, by default "pearson_residuals".
+    return_raw : bool, optional
+        Whether to return the raw Pearson residuals, by default False.
+    copy : bool, optional
+        Whether to return a copy of the AnnData object, by default True.
+
+    Returns
+    -------
+    AnnData | np.ndarray | None
+        AnnData object with Pearson residuals stored in the specified layer, or raw Pearson residuals if return_raw is True.
+    """
+    if layer is not None:
+        X = adata.layers[layer]
+    else:
+        X = adata.X
+
+    mu = np.array(adata.var[mu_key].values)
+    sigma2 = np.array(adata.var[sigma2_key].values)
+    dispersion = np.power(mu, 2) / sigma2
+    dispersion[sigma2 <= 0] = np.nan
+
+    if seq_depth_key is not None:
+        seq_depth = np.array(adata.obs[seq_depth_key].values)
+    else:
+        seq_depth = np.array(X.sum(axis=1)).squeeze()
+
+    print("Computing Pearson's residuals")
+    seq_depth_sq = np.power(seq_depth, 2)
+    d = dispersion[min_variance < sigma2]
+    dispersion_trimmed_mean = stats.trimboth(d, trim_frac).mean()
+
+    # compute expected mean of counts
+    M = np.outer(seq_depth, mu)
+    # compute variance of counts
+    V = M + np.outer(seq_depth_sq, np.power(mu, 2) / dispersion_trimmed_mean)
+    V[V <= 0] = 1
+
+    # normalize counts
+    Z = (X - M) / np.sqrt(V)
+    Z = Z.clip(-z_threshold, z_threshold)
+
+    Z = np.array(Z)
+
+    if return_raw:
+        return Z
+    else:
+        adata.layers[output_layer] = Z
+        return adata if copy else None
+    
