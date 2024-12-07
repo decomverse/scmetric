@@ -5,11 +5,10 @@ Contrastive PCA (cPCA) is a linear dimensionality reduction technique that uses 
 ==========
 """
 
-import numpy as np
 import numpy.linalg as la
-from scipy import linalg
 from sklearn import utils
 from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.decomposition import TruncatedSVD
 
 
 class CPCA(BaseEstimator, TransformerMixin):
@@ -23,18 +22,17 @@ class CPCA(BaseEstimator, TransformerMixin):
     cPCA: https://www.nature.com/articles/s41467-018-04608-8
     """
 
-    def __init__(self, n_components=2):
-        self.n_components = n_components
+    def __init__(self, n_components=10, **kwargs):
+        self.svd_ = TruncatedSVD(n_components=n_components, **kwargs)
         self.fitted = False
 
     def _trace_ratio(self, eps=1e-3):
         utils.validation.check_is_fitted(self)
 
         # Contrastive axes
-        V = self.components  # Only the top n_components axes
-        # V = self.contrastive_eigenvectors  # Or maybe all evecs?
+        V = self.svd_.components_
 
-        target_var = la.multi_dot([V.T, self.target_cov, V]).trace()
+        target_var = la.multi_dot([V, self.target_cov, V.T]).trace()
 
         # this is the way to add eps in cNRL by Fujiwara et al., 2020.
         # https://arxiv.org/abs/2005.12419
@@ -43,7 +41,7 @@ class CPCA(BaseEstimator, TransformerMixin):
 
         # here is the new way to add eps to make sure eps is the ratio of tr_fg
 
-        background_var = la.multi_dot([V.T, self.background_cov, V]).trace() + target_var * eps
+        background_var = la.multi_dot([V, self.background_cov, V.T]).trace() + (target_var * eps)
 
         alpha = target_var / background_var
 
@@ -77,7 +75,7 @@ class CPCA(BaseEstimator, TransformerMixin):
             Maximum number of iterations for the iterative process to find the best alpha.
 
         # Automatic contrast parameter estimation method is adopted from:
-          https://github.com/takanori-fujiwara/cmca/blob/c459393f517b44f616c000f8790df71161869837/cmca.py#L242
+        #   https://github.com/takanori-fujiwara/cmca/blob/c459393f517b44f616c000f8790df71161869837/cmca.py#L242
         """
         if background_cov.shape[1] != target_cov.shape[1]:
             raise ValueError("Covariance matrices should have the same dim.")
@@ -95,15 +93,7 @@ class CPCA(BaseEstimator, TransformerMixin):
         self.alpha = alpha
         self.contrastive_cov = self.target_cov - alpha * self.background_cov
 
-        w, v = linalg.eigh(self.contrastive_cov)
-
-        perm = np.argsort(-w)
-        self.contrastive_eigenvalues, self.contrastive_eigenvectors = w[perm], v[:, perm]
-
-        self.components = self.contrastive_eigenvectors[:, : self.n_components]
-        top_w = self.contrastive_eigenvalues[: self.n_components]
-        self.loadings = self.components @ np.diag(np.sqrt(np.abs(top_w)))
-        # self.totalPosEigenvalue = np.sum(self.contrastive_eigenvalues[self.contrastive_eigenvalues < 0])
+        self.svd_.fit(self.contrastive_cov)
 
         return self
 
@@ -122,8 +112,10 @@ class CPCA(BaseEstimator, TransformerMixin):
                 "target_var": target_var,
                 "background_var": background_var,
                 "contrastive_var": target_var - self.alpha * background_var,
-                "components": self.components.copy(),
-                "loadings": self.loadings.copy(),
+                "components": self.svd_.components_.copy(),
+                "explained_variance_ratio": self.svd_.explained_variance_ratio_.copy(),
+                "explained_variance": self.svd_.explained_variance_.copy(),
+                "singular_values": self.svd_.singular_values_.copy(),
             }
             self.fit_trace.append(log)
 
@@ -155,4 +147,4 @@ class CPCA(BaseEstimator, TransformerMixin):
         """
         utils.validation.check_is_fitted(self)
 
-        return X @ self.components
+        return self.svd_.transform(X)
