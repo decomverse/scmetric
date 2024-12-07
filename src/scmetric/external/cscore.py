@@ -159,7 +159,7 @@ def IRLS(
     mu = np.clip(mu, 0, 1)
     mu[neg_inds] = np.nan
     mu[sigma] = np.nan
-    
+
     # Post-process the co-expression estimates
     if post_process:
         est = post_process_est(est)
@@ -191,6 +191,7 @@ def CSCORE(
     seq_depth=None,
     post_process=True,
     compute_pvals=False,
+    seq_depth_key="seq_depth",
     mean_key="mu",
     sigma2_key="sigma2",
     low_var_key="has_low_variance",
@@ -202,28 +203,43 @@ def CSCORE(
     copy=False,
 ):
     """
-    Implement CS-CORE for inferring cell-type-specific co-expression networks with scanpy object
+    Implement CS-CORE for inferring cell-type-specific co-expression networks with scanpy object.
 
     Parameters
     ----------
     adata: AnnData
-        Single cell data object. The raw UMI count data are stored as adata.raw.X, which is required for
-    gene_index: 1-dimensional Numpy array, length p
-        Integer indexes for the genes of interest, whose co-expression networks will be estimated in this function.
+        Single cell data object.
+    seq_depth: 1-dimensional Numpy array, optional
+        Sum of UMI counts across all genes for each cell. If None, it will be computed from the data.
+    post_process: bool, optional
+        Whether to post-process co-expression estimates to be within [-1,1], by default True.
+    compute_pvals: bool, optional
+        Whether to compute p-values and test statistics, by default False.
+    seq_depth_key: str, optional
+        Key for the sequencing depth values in adata.obs, by default "seq_depth".
+    mean_key: str, optional
+        Key for the mean values in adata.var, by default "mu".
+    sigma2_key: str, optional
+        Key for the variance values in adata.var, by default "sigma2".
+    low_var_key: str, optional
+        Key for the low variance indicator in adata.var, by default "has_low_variance".
+    corr_mat_key: str, optional
+        Key for the correlation matrix in adata.varp, by default "corr_mat".
+    corr_mat_pval_key: str, optional
+        Key for the correlation matrix p-values in adata.varp, by default "corr_mat_pval".
+    corr_mat_z_key: str, optional
+        Key for the correlation matrix test statistics in adata.varp, by default "corr_mat_z".
+    layer: str, optional
+        Layer of the AnnData object to use, by default None.
+    return_raw: bool, optional
+        Whether to return the raw results, by default False.
+    copy: bool, optional
+        Whether to return a copy of the AnnData object, by default False.
 
     Returns
     -------
-    est: p by p Numpy array
-        Estimates of co-expression networks among p genes. Each entry saves the correlation between two genes.
-    p_value: p by p Numpy array
-        p values against H_0: two gene expressions are independent. Please refer to the paper for more details.
-    test_stat:
-        Test statistics against H_0: two gene expressions are independent. Please refer to the paper for more details.
-
-    References
-    ----------
-    Su, C., Xu, Z., Shan, X. et al. Cell-type-specific co-expression inference from single cell RNA-sequencing data.
-    Nat Commun 14, 4846 (2023). https://doi.org/10.1038/s41467-023-40503-7
+    AnnData | dict | None
+        AnnData object with co-expression estimates and optionally p-values and test statistics, or raw results if return_raw is True.
     """
     adata = adata.copy() if copy else adata
 
@@ -233,9 +249,9 @@ def CSCORE(
         X = adata.X
 
     if seq_depth is None:
-        seq_depth = X.sum(axis = 1).A1
+        seq_depth = X.sum(axis=1).A1
 
-    res = IRLS(X, seq_depth, post_process=post_process)
+    res = IRLS(X, seq_depth, post_process=post_process, compute_pvals=compute_pvals)
 
     if return_raw:
         return res
@@ -243,6 +259,7 @@ def CSCORE(
         adata.var[mean_key] = res["mu"]
         adata.var[sigma2_key] = res["sigma2"]
         adata.var[low_var_key] = np.isnan(res["sigma2"])
+        adata.obs[seq_depth_key] = seq_depth
 
         adata.varp[corr_mat_key] = res["corr_mat"]
         if compute_pvals:
@@ -251,15 +268,16 @@ def CSCORE(
 
         return adata if copy else None
 
+
 def compute_pearson_residuals(
     adata: ad.AnnData,
+    seq_depth: np.ndarray | None = None,
     min_variance: float = 1e-12,
     trim_frac: float = 0.25,
     z_threshold: float = 10,
     layer: str | None = None,
     mu_key: str = "mu",
     sigma2_key: str = "sigma2",
-    seq_depth_key: str | None = "seq_depth",
     output_layer: str = "pearson_residuals",
     return_raw: bool = False,
     copy: bool = True,
@@ -298,20 +316,20 @@ def compute_pearson_residuals(
     AnnData | np.ndarray | None
         AnnData object with Pearson residuals stored in the specified layer, or raw Pearson residuals if return_raw is True.
     """
+    adata = adata.copy() if copy else adata
+
     if layer is not None:
         X = adata.layers[layer]
     else:
         X = adata.X
 
+    if seq_depth is None:
+        seq_depth = X.sum(axis=1).A1
+
     mu = np.array(adata.var[mu_key].values)
     sigma2 = np.array(adata.var[sigma2_key].values)
     dispersion = np.power(mu, 2) / sigma2
     dispersion[sigma2 <= 0] = np.nan
-
-    if seq_depth_key is not None:
-        seq_depth = np.array(adata.obs[seq_depth_key].values)
-    else:
-        seq_depth = np.array(X.sum(axis=1)).squeeze()
 
     print("Computing Pearson's residuals")
     seq_depth_sq = np.power(seq_depth, 2)
@@ -335,4 +353,3 @@ def compute_pearson_residuals(
     else:
         adata.layers[output_layer] = Z
         return adata if copy else None
-    
