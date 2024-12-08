@@ -38,7 +38,7 @@ def cov2corr(cov_mat: np.ndarray, posrprocess: bool = True) -> tuple[np.ndarray,
     np.ndarray
         Correlation matrix.
     """
-    sigma2 = np.diag(cov_mat)
+    sigma2 = np.diag(cov_mat).copy()
 
     filter_mask = (sigma2 <= 0) | np.isnan(sigma2)
     sigma2[filter_mask] = 1
@@ -52,7 +52,7 @@ def cov2corr(cov_mat: np.ndarray, posrprocess: bool = True) -> tuple[np.ndarray,
         corr_mat = np.clip((corr_mat + corr_mat.T) / 2, -1, 1)
         np.fill_diagonal(corr_mat, 1)
 
-    return cov_mat, sigma2
+    return corr_mat, sigma2
 
 
 def cor2cov(corr_mat: np.ndarray, sigma2: np.ndarray) -> np.ndarray:
