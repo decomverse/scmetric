@@ -24,34 +24,61 @@ class ExpressionStats(TypedDict):
     test_stat_mat: np.ndarray
 
 
-def post_process_est(est):
+def cov2corr(cov_mat: np.ndarray, posrprocess: bool = True) -> tuple[np.ndarray, np.ndarray]:
     """
-    Post-process the co-expression estimates to ensure they are within the range [-1, 1].
+    Convert a covariance matrix to a correlation matrix.
 
     Parameters
     ----------
-    est: numpy.ndarray
-        The co-expression estimates to be post-processed.
+    cov_mat : np.ndarray
+        Covariance matrix.
 
     Returns
     -------
-    numpy.ndarray
-        The post-processed co-expression estimates.
+    np.ndarray
+        Correlation matrix.
     """
-    # Post-process CS-CORE estimates
-    neg_gene_inds = np.isnan(np.diag(est))
+    sigma2 = np.diag(cov_mat)
 
-    # Negative variances suggest insufficient biological variation,
-    # and also lack of correlation
-    est[neg_gene_inds, :] = 0
-    est[:, neg_gene_inds] = 0
-
-    # Set all diagonal values to 1
-    np.fill_diagonal(est, 1)
+    filter_mask = (sigma2 <= 0) | np.isnan(sigma2)
+    sigma2[filter_mask] = 1
+    sigma = np.sqrt(sigma2)
+    corr_mat = cov_mat / np.outer(sigma, sigma)
+    corr_mat[filter_mask, :] = 0
+    corr_mat[:, filter_mask] = 0
 
     # Symmetrize and clip values to [-1, 1]
-    est = np.clip((est + est.T) / 2, -1, 1)
-    return est
+    if posrprocess:
+        corr_mat = np.clip((corr_mat + corr_mat.T) / 2, -1, 1)
+        np.fill_diagonal(corr_mat, 1)
+
+    return cov_mat, sigma2
+
+
+def cor2cov(corr_mat: np.ndarray, sigma2: np.ndarray) -> np.ndarray:
+    """
+    Convert a correlation matrix to a covariance matrix.
+
+    Parameters
+    ----------
+    corr_mat : np.ndarray
+        Correlation matrix.
+    sigma2 : np.ndarray
+        Vector of variances.
+
+    Returns
+    -------
+    np.ndarray
+        Covariance matrix.
+    """
+    filter_mask = (sigma2 <= 0) | np.isnan(sigma2)
+    sigma2[filter_mask] = 1
+    sigma = np.sqrt(sigma2)
+    cov_mat = corr_mat * np.outer(sigma, sigma)
+    cov_mat[filter_mask, :] = 0
+    cov_mat[:, filter_mask] = 0
+
+    return cov_mat
 
 
 def IRLS(
@@ -59,7 +86,6 @@ def IRLS(
     seq_depth: np.ndarray,
     max_iter: int = 10,
     delta_threshold: float = 0.01,
-    post_process: bool = True,
     compute_pvals: bool = False,
 ) -> ExpressionStats:
     """
@@ -148,21 +174,7 @@ def IRLS(
     num = np.einsum("i,ij->ij", seq_depth_sq, X_weighted).T @ X_weighted
     seq_depth_sq_weighted = np.einsum("i,ij->ij", seq_depth_sq, 1 / w)
     deno = seq_depth_sq_weighted.T @ seq_depth_sq_weighted
-    covar = num / deno
-
-    # Evaluate co-expression estimates
-    neg_inds = sigma2 < 0
-    sigma2[neg_inds] = 1
-    sigma = np.sqrt(sigma2)
-    est = covar / np.outer(sigma, sigma)
-    est[neg_inds, neg_inds] = np.nan
-    mu = np.clip(mu, 0, 1)
-    mu[neg_inds] = np.nan
-    mu[sigma] = np.nan
-
-    # Post-process the co-expression estimates
-    if post_process:
-        est = post_process_est(est)
+    cov_mat = num / deno
 
     # Evaluate test statistics and p values
     if compute_pvals:
@@ -171,18 +183,29 @@ def IRLS(
         num = np.einsum("i,ij->ij", seq_depth_sq, X_weighted).T @ X_weighted
         seq_depth_sq_weighted = np.einsum("i,ij->ij", seq_depth_sq, 1 / Sigma)
         deno = seq_depth_sq_weighted.T @ seq_depth_sq_weighted
-        test_stat = num / np.sqrt(deno)
-        p_value = 2 * (1 - stats.norm.cdf(np.abs(test_stat)))
+        test_stat_mat = num / np.sqrt(deno)
+        pval_mat = 2 * (1 - stats.norm.cdf(np.abs(test_stat_mat)))
     else:
-        test_stat = np.zeros_like(est)
-        p_value = np.ones_like(est)
+        test_stat_mat = np.zeros_like(cov_mat)
+        pval_mat = np.ones_like(cov_mat)
+
+    # Evaluate co-expression estimates
+    neg_inds = sigma2 < 0
+    sigma2[neg_inds] = np.nan
+    np.fill_diagonal(cov_mat, sigma2)
+    corr_mat = cov2corr(cov_mat)[0]
+
+    # Clean up mean rate estimates
+    mu[neg_inds] = np.nan
+    mu = np.clip(mu, 0, 1)
+    mu = mu / np.nansum(mu)
 
     return {
-        "mu": np.clip(mu, 0, 1),
+        "mu": mu,
         "sigma2": sigma2,
-        "corr_mat": est,
-        "pval_mat": p_value,
-        "test_stat_mat": test_stat,
+        "corr_mat": corr_mat,
+        "pval_mat": pval_mat,
+        "test_stat_mat": test_stat_mat,
     }
 
 
