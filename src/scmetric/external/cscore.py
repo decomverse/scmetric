@@ -13,6 +13,8 @@ import numpy as np
 import scipy.stats as stats
 from scipy.sparse import issparse
 
+from .stats import cov2corr
+
 
 class ExpressionStats(TypedDict):
     """A TypedDict for storing expression statistics."""
@@ -22,63 +24,6 @@ class ExpressionStats(TypedDict):
     corr_mat: np.ndarray
     pval_mat: np.ndarray
     test_stat_mat: np.ndarray
-
-
-def cov2corr(cov_mat: np.ndarray, posrprocess: bool = True) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Convert a covariance matrix to a correlation matrix.
-
-    Parameters
-    ----------
-    cov_mat : np.ndarray
-        Covariance matrix.
-
-    Returns
-    -------
-    np.ndarray
-        Correlation matrix.
-    """
-    sigma2 = np.diag(cov_mat)
-
-    filter_mask = (sigma2 <= 0) | np.isnan(sigma2)
-    sigma2[filter_mask] = 1
-    sigma = np.sqrt(sigma2)
-    corr_mat = cov_mat / np.outer(sigma, sigma)
-    corr_mat[filter_mask, :] = 0
-    corr_mat[:, filter_mask] = 0
-
-    # Symmetrize and clip values to [-1, 1]
-    if posrprocess:
-        corr_mat = np.clip((corr_mat + corr_mat.T) / 2, -1, 1)
-        np.fill_diagonal(corr_mat, 1)
-
-    return cov_mat, sigma2
-
-
-def cor2cov(corr_mat: np.ndarray, sigma2: np.ndarray) -> np.ndarray:
-    """
-    Convert a correlation matrix to a covariance matrix.
-
-    Parameters
-    ----------
-    corr_mat : np.ndarray
-        Correlation matrix.
-    sigma2 : np.ndarray
-        Vector of variances.
-
-    Returns
-    -------
-    np.ndarray
-        Covariance matrix.
-    """
-    filter_mask = (sigma2 <= 0) | np.isnan(sigma2)
-    sigma2[filter_mask] = 1
-    sigma = np.sqrt(sigma2)
-    cov_mat = corr_mat * np.outer(sigma, sigma)
-    cov_mat[filter_mask, :] = 0
-    cov_mat[:, filter_mask] = 0
-
-    return cov_mat
 
 
 def IRLS(
