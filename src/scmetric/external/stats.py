@@ -16,7 +16,7 @@ def cov2corr(cov_mat: np.ndarray, posrprocess: bool = True) -> tuple[np.ndarray,
     np.ndarray
         Correlation matrix.
     """
-    sigma2 = np.diag(cov_mat)
+    sigma2 = np.diag(cov_mat).copy()
 
     filter_mask = (sigma2 <= 0) | np.isnan(sigma2)
     sigma2[filter_mask] = 1
