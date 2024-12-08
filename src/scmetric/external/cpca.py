@@ -5,6 +5,7 @@ Contrastive PCA (cPCA) is a linear dimensionality reduction technique that uses 
 ==========
 """
 
+import numpy as np
 import numpy.linalg as la
 from sklearn import utils
 from sklearn.base import BaseEstimator, TransformerMixin
@@ -31,6 +32,7 @@ class CPCA(BaseEstimator, TransformerMixin):
 
         # Contrastive axes
         V = self.svd_.components_
+
 
         target_var = la.multi_dot([V, self.target_cov, V.T]).trace()
 
@@ -119,7 +121,7 @@ class CPCA(BaseEstimator, TransformerMixin):
             }
             self.fit_trace.append(log)
 
-            rel_delta_alpha = (new_alpha - alpha) / (alpha + 1e-15)
+            rel_delta_alpha = np.abs(new_alpha - alpha) / (alpha + 1e-15)
             print(
                 f"{iter}: alpha={alpha:.2e}, target_var={target_var:.2e}, background_var={background_var:.2e}, rel_delta_alpha={rel_delta_alpha:.2e}"
             )
