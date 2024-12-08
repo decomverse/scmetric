@@ -33,7 +33,6 @@ class CPCA(BaseEstimator, TransformerMixin):
         # Contrastive axes
         V = self.svd_.components_
 
-
         target_var = la.multi_dot([V, self.target_cov, V.T]).trace()
 
         # this is the way to add eps in cNRL by Fujiwara et al., 2020.

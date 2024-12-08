@@ -13,7 +13,7 @@ import numpy as np
 import scipy.stats as stats
 from scipy.sparse import issparse
 
-from .stats import cov2corr
+from .stats import cov2corr, nearest_spd
 
 
 class ExpressionStats(TypedDict):
@@ -158,6 +158,7 @@ def CSCORE(
     adata: ad.AnnData,
     seq_depth=None,
     compute_pvals=False,
+    enforce_positive=False,
     seq_depth_key="seq_depth",
     mean_key="mu",
     sigma2_key="sigma2",
@@ -217,6 +218,9 @@ def CSCORE(
         seq_depth = X.sum(axis=1).A1
 
     res = IRLS(X, seq_depth, compute_pvals=compute_pvals)
+
+    if enforce_positive:
+        res["corr_mat"] = nearest_spd(res["corr_mat"])
 
     if return_raw:
         return res
