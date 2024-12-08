@@ -212,7 +212,6 @@ def IRLS(
 def CSCORE(
     adata: ad.AnnData,
     seq_depth=None,
-    post_process=True,
     compute_pvals=False,
     seq_depth_key="seq_depth",
     mean_key="mu",
@@ -234,8 +233,6 @@ def CSCORE(
         Single cell data object.
     seq_depth: 1-dimensional Numpy array, optional
         Sum of UMI counts across all genes for each cell. If None, it will be computed from the data.
-    post_process: bool, optional
-        Whether to post-process co-expression estimates to be within [-1,1], by default True.
     compute_pvals: bool, optional
         Whether to compute p-values and test statistics, by default False.
     seq_depth_key: str, optional
@@ -274,7 +271,7 @@ def CSCORE(
     if seq_depth is None:
         seq_depth = X.sum(axis=1).A1
 
-    res = IRLS(X, seq_depth, post_process=post_process, compute_pvals=compute_pvals)
+    res = IRLS(X, seq_depth, compute_pvals=compute_pvals)
 
     if return_raw:
         return res
