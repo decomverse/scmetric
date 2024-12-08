@@ -215,7 +215,7 @@ def CSCORE(
         X = adata.X
 
     if seq_depth is None:
-        seq_depth = X.sum(axis=1).A1
+        seq_depth = np.array(X.sum(axis=1)).squeeze()
 
     res = IRLS(X, seq_depth, compute_pvals=compute_pvals)
 
@@ -293,7 +293,7 @@ def compute_pearson_residuals(
         X = adata.X
 
     if seq_depth is None:
-        seq_depth = X.sum(axis=1).A1
+        seq_depth = np.array(X.sum(axis=1)).squeeze()
 
     mu = np.array(adata.var[mu_key].values)
     sigma2 = np.array(adata.var[sigma2_key].values)

@@ -10,6 +10,7 @@ import numpy.linalg as la
 from sklearn import utils
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.decomposition import TruncatedSVD
+from .stats import nearest_spd
 
 
 class CPCA(BaseEstimator, TransformerMixin):
@@ -42,10 +43,11 @@ class CPCA(BaseEstimator, TransformerMixin):
 
         # here is the new way to add eps to make sure eps is the ratio of tr_fg
 
-        background_var = la.multi_dot([V, self.background_cov, V.T]).trace() + (target_var * eps)
+        background_var = la.multi_dot([V, self.background_cov, V.T]).trace()
 
-        alpha = target_var / background_var
-
+        delta = (target_var * eps)
+        alpha = target_var / (background_var + delta)
+        
         return alpha, target_var, background_var
 
     def fit(
@@ -55,7 +57,7 @@ class CPCA(BaseEstimator, TransformerMixin):
         alpha=None,
         eps=1e-3,
         convergence_ratio=1e-2,
-        max_iter=10,
+        max_iter=20,
     ):
         """
         Fit the model with the given target and background covariance matrices.
@@ -81,13 +83,13 @@ class CPCA(BaseEstimator, TransformerMixin):
         if background_cov.shape[1] != target_cov.shape[1]:
             raise ValueError("Covariance matrices should have the same dim.")
 
-        self.target_cov = target_cov
-        self.background_cov = background_cov
+        self.target_cov = nearest_spd(target_cov, iterate=True)
+        self.background_cov = nearest_spd(background_cov, iterate=True)
 
         if alpha is None:
-            self._fit_with_best_alpha(eps, convergence_ratio, max_iter)
+            self._fit_with_best_alpha(eps=eps, convergence_ratio=convergence_ratio, max_iter=max_iter)
         else:
-            self._fit_with_manual_alpha(alpha)
+            self._fit_with_manual_alpha(alpha=alpha)
 
     def _fit_with_manual_alpha(self, alpha):
         # Recompute contrastive covariance matrix
@@ -100,13 +102,19 @@ class CPCA(BaseEstimator, TransformerMixin):
 
     def _fit_with_best_alpha(self, eps=1e-3, convergence_ratio=1e-2, max_iter=10):
         self.fit_trace = {}
-
+        
         alpha = 0
         self.fit_trace = []
         for iter in range(max_iter):
             self._fit_with_manual_alpha(alpha)
 
             new_alpha, target_var, background_var = self._trace_ratio(eps)
+            
+            rel_delta_alpha = (new_alpha - alpha) / new_alpha
+            
+            print(
+                f"{iter}: alpha={alpha:0.2e}, target_var={target_var:0.2e}, background_var={background_var:0.2e}, new_alpha={new_alpha:0.2e}, rel_delta_alpha={rel_delta_alpha:0.2e}"
+            )            
 
             log = {
                 "alpha": self.alpha,
@@ -119,11 +127,7 @@ class CPCA(BaseEstimator, TransformerMixin):
                 "singular_values": self.svd_.singular_values_.copy(),
             }
             self.fit_trace.append(log)
-
-            rel_delta_alpha = np.abs(new_alpha - alpha) / (alpha + 1e-15)
-            print(
-                f"{iter}: alpha={alpha:.2e}, target_var={target_var:.2e}, background_var={background_var:.2e}, rel_delta_alpha={rel_delta_alpha:.2e}"
-            )
+            
             if rel_delta_alpha <= convergence_ratio:
                 break
 
