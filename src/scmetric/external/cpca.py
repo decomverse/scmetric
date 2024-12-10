@@ -110,7 +110,7 @@ class CPCA(BaseEstimator, TransformerMixin):
 
             new_alpha, target_var, background_var = self._trace_ratio(eps)
             
-            rel_delta_alpha = (new_alpha - alpha) / new_alpha
+            rel_delta_alpha = np.abs(new_alpha - alpha) / new_alpha
             
             print(
                 f"{iter}: alpha={alpha:0.2e}, target_var={target_var:0.2e}, background_var={background_var:0.2e}, new_alpha={new_alpha:0.2e}, rel_delta_alpha={rel_delta_alpha:0.2e}"
