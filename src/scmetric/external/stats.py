@@ -2,7 +2,7 @@ import numpy as np
 import numpy.linalg as la
 
 
-def cov2corr(cov_mat: np.ndarray, posrprocess: bool = True) -> tuple[np.ndarray, np.ndarray]:
+def cov2corr(cov_mat: np.ndarray, postprocess: bool = True) -> tuple[np.ndarray, np.ndarray]:
     """
     Convert a covariance matrix to a correlation matrix.
 
@@ -26,11 +26,11 @@ def cov2corr(cov_mat: np.ndarray, posrprocess: bool = True) -> tuple[np.ndarray,
     corr_mat[:, filter_mask] = 0
 
     # Symmetrize and clip values to [-1, 1]
-    if posrprocess:
+    if postprocess:
         corr_mat = np.clip((corr_mat + corr_mat.T) / 2, -1, 1)
         np.fill_diagonal(corr_mat, 1)
 
-    return cov_mat, sigma2
+    return corr_mat, sigma2
 
 
 def cor2cov(corr_mat: np.ndarray, sigma2: np.ndarray) -> np.ndarray:
@@ -68,7 +68,7 @@ def isPD(B):
         return False
 
 
-def nearest_spd(A, iterate=False):
+def nearest_spd(A, iterate=True):
     """Find the nearest positive-definite matrix to input
 
     A Python/Numpy port of John D'Errico's `nearestSPD` MATLAB code [1], which

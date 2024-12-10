@@ -82,7 +82,7 @@ def IRLS(
     sigma2 = np.dot(seq_depth_sq, (np.power(X_centered, 2) - M)) / seq_4
     theta = np.power(mu, 2) / sigma2
     j = 0
-    delta = np.Inf
+    delta = np.inf
 
     # IRLS for estimating mu and sigma_jj
     while delta > delta_threshold and j <= max_iter:
@@ -90,7 +90,7 @@ def IRLS(
 
         theta_previous = theta
         theta_median = np.median(theta[theta > 0])
-        theta[theta < 0] = np.Inf
+        theta[theta < 0] = np.inf
         w = M + np.outer(seq_depth_sq, np.power(mu, 2) / theta_median)
         w[w <= 0] = 1
         mu = np.dot(seq_depth, X / w) / np.dot(seq_depth_sq, 1 / w)
@@ -111,7 +111,7 @@ def IRLS(
 
     # Weighted least squares for estimating sigma_jj'
     theta_median = np.median(theta[theta > 0])
-    theta[theta < 0] = np.Inf
+    theta[theta < 0] = np.inf
     w = M + np.outer(seq_depth_sq, np.power(mu, 2) / theta_median)
     w[w <= 0] = 1
 
@@ -157,7 +157,7 @@ def IRLS(
 def CSCORE(
     adata: ad.AnnData,
     seq_depth=None,
-    compute_pvals=False,
+    compute_pvals=True,
     enforce_positive=False,
     seq_depth_key="seq_depth",
     mean_key="mu",
