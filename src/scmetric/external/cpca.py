@@ -627,7 +627,7 @@ class scCPCA(CPCA_cov):
             obsm[key] = np.array(self._transform(adata, layer=layer, raw=raw, copy=copy, components=components_).X)
 
         if raw:
-            return ad.AnnData(X=None, obs=adata.obs, var=adata.var, obsm=obsm)
+            return ad.AnnData(X=None, obs=adata.obs, obsm=obsm)
         else:
             adata_proj = adata.copy() if copy else adata
             adata_proj.obsm = adata_proj.obsm | obsm
