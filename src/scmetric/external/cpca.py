@@ -598,7 +598,7 @@ class scCPCA(CPCA_cov):
         """
         return self._transform(adata, layer=layer, raw=raw, copy=copy)
 
-    def get_projection_trace(self, adata, layer=None, raw=True, copy=False):
+    def get_projection_trace(self, adata, layer=None, raw=False, copy=False):
         """
         Get the projection trace of the data.
 
@@ -624,17 +624,17 @@ class scCPCA(CPCA_cov):
         for i in range(len(self.fit_trace)):
             key = f'cpca_alpha={self.fit_trace[i]["alpha"]:.2e}'
             components_ = self.fit_trace[i]["components"]
-            projection = np.array(self._transform(adata, layer=layer, raw=raw, copy=copy, components=components_).X)
+            projection = np.array(self._transform(adata, layer=layer, raw=True, copy=False, components=components_).obsm["X_cPCA"])
             obsm[key] = projection
 
         if raw:
             return ad.AnnData(X=projection, obs=adata.obs, obsm=obsm)
         else:
             adata_proj = adata.copy() if copy else adata
-            adata_proj.obsm = adata_proj.obsm | obsm
+            adata_proj.obsm = dict(adata_proj.obsm) | obsm
             return adata_proj
 
-    def plot_projection_trace(self, adata, labels, cmap="RdYlB_r", palette="tab10", size=None, layer=None):
+    def plot_projection_trace(self, adata, labels, cmap="RdYlBu_r", palette="tab10", size=None, layer=None):
         """
         Plot the projection trace of the data.
 

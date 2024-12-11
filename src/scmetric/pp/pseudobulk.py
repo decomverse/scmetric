@@ -30,7 +30,7 @@ def match(a: Sequence[Hashable], b: Sequence[Hashable]) -> pd.Series:
 
 def compute_pseudobulk(
     adata: ad.AnnData,
-    layer: str = "logcounts",
+    layer: str| None = None,
     grouping_var_key: str = "samples",
     normalization_method: Literal["cell_counts_norm"] | Literal["lib_size_norm"] = "cell_counts_norm",
     target_lib_size: float = 1e4,
@@ -65,8 +65,7 @@ def compute_pseudobulk(
 
     # Extract pseudbulk sample metadata
     ID_pb_matched = match(ID_pb, ID_cells)
-    row_idx = ID_pb_matched["matched_idx"].dropna().astype(int)
-    PB_obs = obs_df.iloc[row_idx, :].set_index(ID_pb_matched.index[row_idx])
+    PB_obs = obs_df.iloc[ID_pb_matched, :].set_index(ID_pb_matched.index)
 
     # Remove covariates that are either constant or have the same number of unique values as the number of pseudobulk samples
     uv_count = np.array(obs_df.nunique())
@@ -80,9 +79,11 @@ def compute_pseudobulk(
 
     # Compute pseudobulk samples
     if layer is not None:
+        raw_layer = layer + "_raw"
         print(f"aggregating on layer {layer}")
         X = adata.layers[layer]
     else:
+        raw_layer = "X_raw"        
         print("aggregating on .X attribute since no layer specified")
         X = adata.X
 
@@ -122,7 +123,7 @@ def compute_pseudobulk(
         normalization_method = "cell_counts_norm"
     PB_adata.uns["normalization_method"] = normalization_method
 
-    PB_adata.layers[layer + "sum"] = np.array(PB_adata.X)
+    PB_adata.layers[raw_layer] = np.array(PB_adata.X)
     if normalization_method == "cell_counts_norm":
         X_PB = X_PB / PB_obs["cell_counts"].to_numpy().reshape(-1, 1)
         PB_adata.X = X_PB
