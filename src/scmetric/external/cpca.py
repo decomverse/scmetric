@@ -12,8 +12,8 @@ from sklearn import utils
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.covariance import OAS, LedoitWolf, ShrunkCovariance, empirical_covariance
 
-from .cscore import IRLS
-from .stats import cor2cov, nearest_spd
+from scmetric.external.cscore import IRLS
+from scmetric.tl.stats import cor2cov, nearest_spd
 
 
 class CPCA_cov(BaseEstimator, TransformerMixin):
@@ -32,6 +32,25 @@ class CPCA_cov(BaseEstimator, TransformerMixin):
         self.fitted = False
 
     def _trace_ratio(self, eps=1e-3, min_eig=1e-6):
+        """
+        Compute the trace ratio for the contrastive PCA.
+
+        Parameters
+        ----------
+        eps : float, optional
+            Small value to ensure numerical stability.
+        min_eig : float, optional
+            Minimum eigenvalue threshold.
+
+        Returns
+        -------
+        alpha : float
+            Regularization parameter.
+        target_var : float
+            Variance of the target dataset.
+        background_var : float
+            Variance of the background dataset.
+        """
         utils.validation.check_is_fitted(self)
 
         # Contrastive axes
@@ -102,6 +121,14 @@ class CPCA_cov(BaseEstimator, TransformerMixin):
             self._fit_with_manual_alpha(alpha=alpha)
 
     def _fit_with_manual_alpha(self, alpha):
+        """
+        Fit the model with a manually specified alpha.
+
+        Parameters
+        ----------
+        alpha : float
+            Regularization parameter.
+        """
         # Recompute contrastive covariance matrix
         self.alpha = alpha
         self.contrastive_cov = self.target_cov - alpha * self.background_cov
@@ -123,6 +150,23 @@ class CPCA_cov(BaseEstimator, TransformerMixin):
         return self
 
     def _fit_with_best_alpha(self, eps=1e-3, convergence_ratio=1e-2, max_iter=10):
+        """
+        Fit the model by finding the best alpha automatically.
+
+        Parameters
+        ----------
+        eps : float, optional
+            Small value to ensure numerical stability.
+        convergence_ratio : float, optional
+            Convergence threshold for the iterative process to find the best alpha.
+        max_iter : int, optional
+            Maximum number of iterations for the iterative process to find the best alpha.
+
+        Returns
+        -------
+        self : object
+            Returns the instance itself.
+        """
         self.fit_trace = {}
 
         self.fit_trace = []
@@ -490,4 +534,169 @@ class scCPCA(CPCA_cov):
             eps=eps,
             convergence_ratio=convergence_ratio,
             max_iter=max_iter,
+        )
+
+    def _transform(self, adata, layer=None, raw=False, copy=False, components=None):
+        """
+        Transform the data using the fitted model.
+
+        Parameters
+        ----------
+        adata : AnnData
+            The input data to be transformed.
+        layer : str, optional
+            The layer of the AnnData object to use for transformation.
+        raw : bool, optional
+            Whether to return a raw AnnData object.
+        copy : bool, optional
+            Whether to return a copy of the AnnData object.
+        components : array-like, optional
+            The components to use for transformation.
+
+        Returns
+        -------
+        adata_proj : AnnData
+            The transformed AnnData object.
+        """
+        if components is None:
+            utils.validation.check_is_fitted(self)
+            components = self.components
+
+        if layer is not None:
+            projections = np.array(adata.layers[layer] @ components)
+        else:
+            projections = np.array(adata.X @ components)
+
+        if raw:
+            adata_proj = ad.AnnData(X=None, obs=adata.obs)
+        else:
+            adata_proj = adata.copy() if copy else adata
+
+        adata_proj.obsm["X_cPCA"] = projections
+        return adata_proj
+
+    def transform(self, adata, layer=None, raw=False, copy=False):
+        """
+        Transform the data using the fitted model.
+
+        Parameters
+        ----------
+        adata : AnnData
+            The input data to be transformed.
+        layer : str, optional
+            The layer of the AnnData object to use for transformation.
+        raw : bool, optional
+            Whether to return a raw AnnData object.
+        copy : bool, optional
+            Whether to return a copy of the AnnData object.
+
+        Returns
+        -------
+        adata_proj : AnnData
+            The transformed AnnData object.
+        """
+        return self._transform(adata, layer=layer, raw=raw, copy=copy)
+
+    def get_projection_trace(self, adata, layer=None, raw=True, copy=False):
+        """
+        Get the projection trace of the data.
+
+        Parameters
+        ----------
+        adata : AnnData
+            The input data to be projected.
+        layer : str, optional
+            The layer of the AnnData object to use for projection.
+        raw : bool, optional
+            Whether to return a raw AnnData object.
+        copy : bool, optional
+            Whether to return a copy of the AnnData object.
+
+        Returns
+        -------
+        adata_proj : AnnData
+            The AnnData object containing the projection trace.
+        """
+        utils.validation.check_is_fitted(self)
+
+        obsm = {}
+        for i in range(len(self.fit_trace)):
+            key = f'cpca_alpha={self.fit_trace[i]["alpha"]:.2e}'
+            components_ = self.fit_trace[i]["components"]
+            obsm[key] = np.array(self._transform(adata, layer=layer, raw=raw, copy=copy, components=components_).X)
+
+        if raw:
+            return ad.AnnData(X=None, obs=adata.obs, var=adata.var, obsm=obsm)
+        else:
+            adata_proj = adata.copy() if copy else adata
+            adata_proj.obsm = adata_proj.obsm | obsm
+            return adata_proj
+
+    def plot_projection_trace(self, adata, labels, cmap="RdYlB_r", palette="tab10", size=None, layer=None):
+        """
+        Plot the projection trace of the data.
+
+        Parameters
+        ----------
+        adata : AnnData
+            The input data to be projected.
+        labels : array-like
+            Labels corresponding to the data points in adata.
+        cmap : str, optional
+            The color map to use for plotting.
+        palette : str, optional
+            The color palette to use for plotting.
+        size : float, optional
+            The size of the points in the plot.
+        layer : str, optional
+            The layer of the AnnData object to use for projection.
+        """
+        adata_proj = self.get_projection_trace(adata=adata, layer=layer, raw=True, copy=False)
+
+        for key in adata_proj.obsm.keys():
+            sc.pl.embedding(
+                adata_proj,
+                basis=key,
+                color=labels,
+                title=key,
+                cmap=cmap,
+                palette=palette,
+                size=size,
+                frameon=False,
+                show=True,
+                ncols=1,
+            )
+
+    def plot_projection(self, adata, labels, cmap="RdYlBu_r", palette="tab10", size=None, layer=None):
+        """
+        Plot the projection of the data.
+
+        Parameters
+        ----------
+        adata : AnnData
+            The input data to be projected.
+        labels : array-like
+            Labels corresponding to the data points in adata.
+        cmap : str, optional
+            The color map to use for plotting.
+        palette : str, optional
+            The color palette to use for plotting.
+        size : float, optional
+            The size of the points in the plot.
+        layer : str, optional
+            The layer of the AnnData object to use for projection.
+        """
+        adata_proj = self.transform(adata, layer=layer, raw=True, copy=False)
+
+        sc.pl.embedding(
+            adata_proj,
+            basis="X_cPCA",
+            color=labels,
+            title="cPCA",
+            cmap=cmap,
+            palette=palette,
+            size=size,
+            frameon=False,
+            show=True,
+            ncols=1,
         )
