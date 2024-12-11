@@ -13,7 +13,7 @@ import numpy as np
 import scipy.stats as stats
 from scipy.sparse import issparse
 
-from .stats import cov2corr, nearest_spd
+from scmetric.tl.stats import cov2corr, nearest_spd
 
 
 class ExpressionStats(TypedDict):
@@ -210,9 +210,9 @@ def CSCORE(
     adata = adata.copy() if copy else adata
 
     if layer is not None:
-        X = adata.layers[layer]
+        X = np.array(adata.layers[layer])
     else:
-        X = adata.X
+        X = np.array(adata.X)
 
     if seq_depth is None:
         seq_depth = np.array(X.sum(axis=1)).squeeze()
@@ -288,9 +288,9 @@ def compute_pearson_residuals(
     adata = adata.copy() if copy else adata
 
     if layer is not None:
-        X = adata.layers[layer]
+        X = np.array(adata.layers[layer])
     else:
-        X = adata.X
+        X = np.array(adata.X)
 
     if seq_depth is None:
         seq_depth = np.array(X.sum(axis=1)).squeeze()

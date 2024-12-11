@@ -1,1 +1,3 @@
-from .basic import basic_preproc
+from .pseudobulk import compute_pseudobulk
+
+__all__ = ["compute_pseudobulk"]

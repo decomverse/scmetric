@@ -195,7 +195,7 @@ class CPCA_cov(BaseEstimator, TransformerMixin):
 
         obsm = {}
         for i in range(len(self.fit_trace)):
-            key = f'alpha={self.fit_trace[i]["alpha"]}'
+            key = f'alpha={self.fit_trace[i]["alpha"]:.2e}'
             components_ = self.fit_trace[i]["components"]
             projections = adata.X @ components_
             obsm[key] = projections
@@ -224,14 +224,14 @@ class CPCA_cov(BaseEstimator, TransformerMixin):
         None
             This function does not return any value. It generates and displays plots.
         """
-        adata = self.get_projection_trace(X)
+        adata_proj = self.get_projection_trace(X)
 
-        adata.obs["label"] = label
-        adata.obs["label"] = adata.obs["label"].astype("category")
+        adata_proj.obs["label"] = label
+        adata_proj.obs["label"] = adata_proj.obs["label"].astype("category")
 
-        for key in adata.obsm.keys():
+        for key in adata_proj.obsm.keys():
             sc.pl.embedding(
-                adata,
+                adata_proj,
                 basis=key,
                 color="label",
                 title=key,

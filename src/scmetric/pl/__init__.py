@@ -1,1 +1,3 @@
-from .basic import BasicClass, basic_plot
+from .basic import plot_corr_scatter, plot_heatmap
+
+__all__ = ["plot_corr_scatter", "plot_heatmap"]
