@@ -624,10 +624,11 @@ class scCPCA(CPCA_cov):
         for i in range(len(self.fit_trace)):
             key = f'cpca_alpha={self.fit_trace[i]["alpha"]:.2e}'
             components_ = self.fit_trace[i]["components"]
-            obsm[key] = np.array(self._transform(adata, layer=layer, raw=raw, copy=copy, components=components_).X)
+            projection = np.array(self._transform(adata, layer=layer, raw=raw, copy=copy, components=components_).X)
+            obsm[key] = projection
 
         if raw:
-            return ad.AnnData(X=None, obs=adata.obs, obsm=obsm)
+            return ad.AnnData(X=projection, obs=adata.obs, obsm=obsm)
         else:
             adata_proj = adata.copy() if copy else adata
             adata_proj.obsm = adata_proj.obsm | obsm
