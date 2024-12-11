@@ -210,9 +210,9 @@ def CSCORE(
     adata = adata.copy() if copy else adata
 
     if layer is not None:
-        X = np.array(adata.layers[layer])
+        X = adata.layers[layer]
     else:
-        X = np.array(adata.X)
+        X = adata.X
 
     if seq_depth is None:
         seq_depth = np.array(X.sum(axis=1)).squeeze()
@@ -288,9 +288,9 @@ def compute_pearson_residuals(
     adata = adata.copy() if copy else adata
 
     if layer is not None:
-        X = np.array(adata.layers[layer])
+        X = adata.layers[layer]
     else:
-        X = np.array(adata.X)
+        X = adata.X
 
     if seq_depth is None:
         seq_depth = np.array(X.sum(axis=1)).squeeze()
