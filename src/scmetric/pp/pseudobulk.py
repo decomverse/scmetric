@@ -103,7 +103,7 @@ def compute_pseudobulk(
         ii = class_map[X_coo.row]
         jj = X_coo.col
         vv = X_coo.data
-        X_PB_coo = coo_matrix((vv, (ii, jj)), shape=(len(grouped), X_coo.shape[1]))
+        X_PB_coo = coo_matrix((vv, (ii, jj)), shape=(len(grouped), adata.shape[1]))
         X_PB_coo.sum_duplicates()
 
         X_PB = np.array(X_PB_coo.todense())
