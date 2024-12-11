@@ -7,6 +7,7 @@ Contrastive PCA (cPCA) is a linear dimensionality reduction technique that uses 
 
 import anndata as ad
 import numpy as np
+import pandas as pd
 import scanpy as sc
 from sklearn import utils
 from sklearn.base import BaseEstimator, TransformerMixin
@@ -270,7 +271,7 @@ class CPCA_cov(BaseEstimator, TransformerMixin):
         """
         adata_proj = self.get_projection_trace(X)
 
-        adata_proj.obs["label"] = label
+        adata_proj.obs["label"] = pd.Categorical(label)
         adata_proj.obs["label"] = adata_proj.obs["label"].astype("category")
 
         for key in adata_proj.obsm.keys():
@@ -692,7 +693,6 @@ class scCPCA(CPCA_cov):
             adata_proj,
             basis="X_cPCA",
             color=labels,
-            title="cPCA",
             cmap=cmap,
             palette=palette,
             size=size,

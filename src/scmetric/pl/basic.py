@@ -95,7 +95,7 @@ def plot_heatmap(
         df = df.iloc[row_perm, col_perm]
     else:
         perm = hierarchy.leaves_list(
-            hierarchy.optimal_leaf_ordering(hierarchy.linkage(X.T, method=linkage_metric, metric=linkage_metric), X.T)
+            hierarchy.optimal_leaf_ordering(hierarchy.linkage(X.T, method=linkage_method, metric=linkage_metric), X.T)
         )
         df = df.iloc[perm, perm]
 
